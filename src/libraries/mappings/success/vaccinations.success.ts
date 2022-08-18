@@ -1,0 +1,3 @@
+export = {
+  GET_ALL_VACCINATION: 'GET_ALL_VACCINATION',
+};
