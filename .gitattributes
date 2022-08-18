@@ -4,3 +4,4 @@
 # Denote all files that are truly binary and should not be modified.
 *.mp4 binary
 *.jpg binary
+src/data/vaccination-data.json filter=lfs diff=lfs merge=lfs -text
