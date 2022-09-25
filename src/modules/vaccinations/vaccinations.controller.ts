@@ -12,12 +12,13 @@ export default class VaccinationsController {
       const rangeSize = Number(range);
       const parseDateFrom = moment(dateFrom);
       const parseDateTo = moment(dateTo);
+      const weekCounts = Math.round(parseDateTo.diff(parseDateFrom, 'week') / rangeSize);
 
       const query = {
         ReportingCountry: c,
         YearWeekDate: {
-          $gte: moment(parseDateFrom).toDate(),
-          $lte: moment(parseDateTo).toDate(),
+          $gte: moment(dateFrom).toDate(),
+          $lte: moment(dateTo).toDate(),
         },
       };
 
@@ -31,6 +32,7 @@ export default class VaccinationsController {
             _id: '$YearWeekISO',
             NumberDosesReceived: { $sum: '$NumberDosesReceived' },
             YearWeekDate: { $first: '$YearWeekDate' },
+            ReportingCountry: { $first: '$YearWeekDate' },
           },
         },
         {
@@ -39,31 +41,32 @@ export default class VaccinationsController {
             week: '$_id',
             NumberDosesReceived: true,
             YearWeekDate: true,
+            ReportingCountry: true,
           },
         },
         { $sort: { week: 1 } },
+
+        {
+          $bucketAuto: {
+            groupBy: '$week',
+            buckets: weekCounts,
+            output: {
+              count: { $sum: '$NumberDosesReceived' },
+            },
+          },
+        },
+
+        {
+          $project: {
+            _id: 0,
+            startWeek: '$_id.min',
+            endWeek: '$_id.max',
+            NumberDosesReceived: '$count',
+          },
+        },
       ]);
 
-      const summary = [];
-
-      let batch = 0;
-      while (batch < summaryQuery.length) {
-        const batchSize = summaryQuery.length - batch < rangeSize ? summaryQuery.length : batch + rangeSize;
-        let NumberDosesReceived = 0;
-        let endWeek;
-        for (let i = batch; i < batchSize; i += 1) {
-          endWeek = summaryQuery[i].week;
-          NumberDosesReceived += summaryQuery[i].NumberDosesReceived;
-        }
-        summary.push({
-          weekStart: summaryQuery[batch].week,
-          weekEnd: endWeek,
-          NumberDosesReceived,
-        });
-        batch += rangeSize;
-      }
-
-      sendResponse(res, VaccinationsSuccess.GET_ALL_VACCINATION, 'Get all vaccinations summary', { summary });
+      sendResponse(res, VaccinationsSuccess.GET_ALL_VACCINATION, 'Get all vaccinations summary', { summaryQuery });
     } catch (error) {
       next(error);
     }
